@@ -19,6 +19,33 @@ jobs:
         working-directory: geo_tools
         run: |
           flutter create . --platforms android --org com.yallabanking --project-name geo_tools
+          python3 - <<'EOF'
+          import os
+          kts = 'android/build.gradle.kts'
+          if os.path.exists(kts):
+              path = kts
+              patch = '''subprojects {
+              val forceSdk = {
+                  val android = extensions.findByName("android")
+                  if (android is com.android.build.gradle.BaseExtension) {
+                      android.compileSdkVersion(36)
+                  }
+              }
+              if (state.executed) forceSdk() else afterEvaluate { forceSdk() }
+          }
+          '''
+          else:
+              path = 'android/build.gradle'
+              patch = '''subprojects {
+              def forceSdk = { p -> if (p.hasProperty('android')) { p.android.compileSdkVersion 36 } }
+              if (state.executed) { forceSdk(project) } else { afterEvaluate { forceSdk(project) } }
+          }
+          '''
+          src = open(path).read()
+          if 'forceSdk' not in src:
+              open(path, 'w').write(patch + '\n' + src)
+          print(open(path).read())
+          EOF
           flutter pub get
           flutter build apk --release
       - uses: actions/upload-artifact@v4
